@@ -48,26 +48,13 @@ postler.panel.Home = function(config) {
                 title: _('resources')
                 ,defaults: { autoHeight: true }
                 ,items: [{
-                    html: '<p>'+'Demo only . . . grid will change, but no real action is taken'+'</p>'
-                    ,border: false
+                    border: false
                     ,bodyStyle: 'padding: 10px'
                 },{
                     xtype: 'postler-grid-s'
                     ,preventRender: true
                 }]
             }]
-            // ,{
-            //     title: _('chunks')
-            //     ,defaults: { autoHeight: true }
-            //     ,items: [{
-            //         html: '<p>'+'Demo only . . . grid will change, but no real action is taken'+'</p>'
-            //         ,border: false
-            //         ,bodyStyle: 'padding: 10px'
-            //     },{
-            //         xtype: 'postler-grid-chunk'
-            //         ,preventRender: true
-            //     }]
-            // }]
         }]
     });
     postler.panel.Home.superclass.constructor.call(this,config);

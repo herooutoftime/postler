@@ -1,4 +1,5 @@
 <?php
+// error_reporting(-1);
 /**
  * postler class file for postler extra
  *
@@ -23,18 +24,15 @@
 
  class Postler {
 
-    protected $server;
-	protected $user;
-	protected $pass;
-	protected $port;
+ 	public $modx;
+	public $resource;
+
 	protected $conn;
 	protected $params;
 	protected $prepare;
 	protected $mail;
 
 	private $mails;
-	public $modx;
-	public $resource;
 
 	public function __construct(modX &$modx, $options = array())
 	{
@@ -102,8 +100,12 @@
 			'allowed_filetypes'	=> explode(',', $this->modx->getOption('postler.allowed_filetypes')),
 			'save_mail'			=> $this->modx->getOption('postler.save_mail'),
 			'save_mail_dir'		=> $this->modx->getOption('postler.save_mail_dir', null, 'postler/'),
+			'tv_message_id'		=> $this->modx->getOption('postler.tv_message_id'),
+			'send_html'			=> $this->modx->getOption('postler.html_emails'),
 			// 'resend'	=> $this->modx->getOption('postler.resend', null, FALSE)		//Mail me even on a reply (which is not needed really)
 			));
+		if($this->params['dryrun'])
+			$this->logs['parameters'][] = 'BE AWARE: THIS IS A SIMULATION! NO DATA WILL BE STORED!';
 	}
 
 	public function initialize($ctx = 'mgr') {
@@ -127,10 +129,25 @@
 	 */
 	public function connect()
 	{
+		$start = $this->modx->getMicroTime();
+		// $this->params['port'] = 143;
+		// $this->params['special'] = '/imap';
 		$this->params['host'] = '{'.$this->params['server'].':'.$this->params['port'].$this->params['special'].'}'.$this->params['folder'];
-		$this->conn = imap_open($this->params['host'], $this->params['user'], $this->params['pass']) 
-			or die('Cannot connect: ' . imap_last_error());
+		$this->logs['connection'][] = $this->params['host'];
+		$this->logs['connection'][] = $this->params['server'];
+		$this->logs['connection'][] = $this->params['port'];
+		$this->logs['connection'][] = $this->params['special'];
+		$this->logs['connection'][] = $this->params['folder'];
 
+		// $this->params['host'] = '{imap.gmail.com:993/imap/ssl}INBOX';
+		// $this->params['user'] = 'andreas.bilz@gmail.com';
+		// $this->params['pass'] = 'vd231ipu09';
+
+		$this->conn = imap_open($this->params['host'], $this->params['user'], $this->params['pass']) 
+			or die('Cannot connect: ' . print_r(imap_errors()));
+		
+		$end = $this->modx->getMicroTime();
+		$this->logs['timing']['connection'] = sprintf("%2.4f", $end - $start);
 		if($this->conn)
 			return true;
 		return false;
@@ -150,11 +167,19 @@
 	 * @return array
 	 */
 	public function search() {
-
-		$criteria_str = 'UNDELETED ';
+		$start = $this->modx->getMicroTime();
+		$criteria_str[] = 'UNDELETED';
+		if($this->params['email'])
+			$criteria_str[] = 'FROM "' . $this->params['email'] . '"';
+		if($this->params['prefix'])
+			$criteria_str[] = 'SUBJECT "' . $this->params['prefix'] . '"';
+		$this->logs['criteria'][] = 'CRITERIA ' . implode(' ', $criteria_str);
 		// if(!empty($this->params['prefix']))
 		// 	$criteria_str .= 'SUBJECT "' . $this->params['prefix'] . '"';
-        return imap_search($this->conn, $criteria_str);
+        $search = imap_search($this->conn, implode(' ', $criteria_str));
+        $end = $this->modx->getMicroTime();
+        $this->logs['timing']['criteria'] = sprintf("%2.4f", $end - $start);
+        return $search;
 	}
 
 	/**
@@ -186,20 +211,14 @@
 		$cnt = 0;
 		// $found = array(277);
 		if(!is_array($found))
-			return 'No mails were found';
+			$this->logs['result'][] = 'No mails were found';
 		foreach($found as $uid) {
+			$this->logs['item'] = array();
+			$this->logs['reports'] = array();
+
 			$mail = $this->get($uid);
 			if(!$mail)
 				continue;
-			
-			// if($this->params['store_mail']) {
-			// 	$pattern = array('<', '>', '@');
-			// 	$replace = array('_');
-			// 	if(!is_dir($this->modx->getOption('base_path') . $this->params['mail_directory']))
-			// 		mkdir($this->modx->getOption('base_path') . $this->params['mail_directory'], 0777, true);
-			// 	if (!file_put_contents($this->modx->getOption('base_path') . $this->params['mail_directory'] . str_replace($pattern, $replace, $mail['header']->message_id) . '.php', serialize($mail)))
-			// 		return 'Could not store mail in file directory';
-			// }
 			
 			$this->mail = $mail;
 			$this->params['runtime']['uid'] = $uid;
@@ -212,11 +231,33 @@
 			// False means we removed a message and go to the next in line
 			if(!$this->analyze($mail))
 				continue;
+			
+			$start = $this->modx->getMicroTime();
 			$this->import();
+			$end = $this->modx->getMicroTime();
+			$this->logs['timing']['import'] = sprintf("%2.4f", $end - $start);
+
+			// Mail me when new, replies won't be sent again (v0.1)
+			// Used to update a resource
+			if(!$this->params['dryrun'])
+				if($this->params['runtime']['send'])
+					if(!$this->sendmail())
+						return 'Error sending mail!';
+
+			// Mark message as deleted from inbox
+			if(!$this->params['dryrun'])
+				if(!$this->params['delete_after'])
+					if(!imap_delete($this->conn, $this->params['runtime']['uid']))
+						echo 'Imap could not delete message';
+			
+			// Sum up the total timings
+			$this->logs['timing']['total'] = array_sum($this->logs['timing']);
+			
+			// Generate report output
+			$this->logs['reports'][] = $this->generate_output();
 			$cnt++;
 		}
 		$this->close();
-		// die();
 		return $this->logs;
 	}
 
@@ -228,6 +269,7 @@
 	 */
 	public function analyze($mail)
 	{
+		$start = $this->modx->getMicroTime();
 		// echo '<br/>';
 		// echo iconv_mime_decode($mail['header']->subject,0,"UTF-8") . ' - ' . $mail['header']->date . '<br/>';
 
@@ -238,18 +280,25 @@
 		 * ** to delete
 		 */
 		// Let's check if we are having a reply (UPDATE) or a new mail
-        $this->params['runtime']['message_id'] = $mail['header']->message_id;
-        $this->params['runtime']['send'] = TRUE;
-        $this->params['runtime']['update'] = FALSE;
+        $this->params['runtime'] = array(
+        	'message_id' => $mail['header']->message_id,
+        	'send' => TRUE,
+        	'update' => FALSE,
+        	);
 
         // Find the message id in the subject
         // If TRUE: Sets TV 'message_id' to find the resource by
         preg_match('/<(.*)>/', $mail['header']->subject, $reply);
         if(count($reply) >= 1) {
-        	$this->params['runtime']['update'] = TRUE;
-        	$this->params['runtime']['send'] = FALSE;
-        	$this->params['runtime']['message_id'] = $reply[0];
+        	$this->params['runtime'] = array(
+        		'update' => TRUE,
+        		'send' => FALSE,
+        		'message_id' => $reply[0],
+        		);
         }
+
+        $this->params['from']['name'] = $mail['header']->from[0]->personal;
+		$this->params['from']['address'] = $mail['header']->from[0]->mailbox . '@' . $mail['header']->from[0]->host;
 
         // Find any of the deposited strings which identifies a deleted message
         // And instantly remove the related resource!
@@ -289,9 +338,6 @@
 		// Lets give markdown a chance
 		if($this->params['use_markdown'] && $this->params['runtime']['markdown'])
 			$content = $this->parse_md($this->params['runtime']['markdown']);
-
-		$this->params['from']['name'] = $mail['header']->from[0]->personal;
-		$this->params['from']['address'] = $mail['header']->from[0]->mailbox . '@' . $mail['header']->from[0]->host;
 		
 		// Do we need to import attachments as well?
 		$tv = array();
@@ -326,8 +372,6 @@
 	            if ($attachment !== false && strlen($attachment) > 0 && $attachment != '') {
 
 	            	$file_rel = $this->params['import_directory'] . date('Y') . DIRECTORY_SEPARATOR . date('m') . DIRECTORY_SEPARATOR . $filename;
-	                if($this->modx->cacheManager->writeFile($this->modx->getOption('base_path') . $file_rel, $attachment))
-	                	$this->logs[] = 'FILE WAS SAVED: ' . $file_rel;
 	                
 	                switch ($at['encoding']) {
 	                    case '3':
@@ -346,6 +390,8 @@
 	                    	$tv[$this->params['import_tv_file']] = $file_rel;
 	                    break;
 	                }
+	                if($this->modx->cacheManager->writeFile($this->modx->getOption('base_path') . $file_rel, $attachment))
+	                	$this->logs['attachments'][] = 'FILE WAS SAVED: ' . $file_rel;
 	            }
 	        }
 	    }
@@ -368,12 +414,14 @@
 				'publishedon'	=> strtotime($mail['header']->date),
 				'parent'		=> $this->params['container'],
 				'context_key'	=> $this->params['context'],
+				'createdby'		=> $this->findUserByEmail($this->mail['header']->from[0]->mailbox . '@' . $this->mail['header']->from[0]->host),
 			), $pagetitle),
 			'tv' => array_merge(array(
-				'message_id'	=> $this->params['runtime']['message_id'],
+				$this->params['tv_message_id']	=> $this->params['runtime']['message_id'],
 			), $tv),
 		);
-		// die();
+		$end = $this->modx->getMicroTime();
+		$this->logs['timing']['analyze'] = sprintf("%2.4f", $end - $start);
 		return true;
 	}
 
@@ -426,7 +474,7 @@
 		// Which comparison mode is chosen
 		// If ':' as a delimiter is found, we need to deal with a TV
 		// Else not found we use the subject and compare with pagetitle
-		if(strpos($comparison, ':') !== FALSE) {
+		if(strpos($comparison, ':') !== FALSE || $this->params['runtime']['update']) {
 			// Identify the resource by the message id
 			$msg_id = $this->prepare['tv']['message_id'];
 			
@@ -443,24 +491,22 @@
 				)
 			);
 		}
+		// Store the mode of the resource
+		$this->params['runtime']['mode'] = 'new';
 		if($this->resource)
-			$this->params['runtime']['mode'] = 'new';
+			$this->params['runtime']['mode'] = 'update';
 			
 		// Ok, no resource found earlier, let's create a new one
 		if(!$this->resource)
 			$this->resource = $this->modx->newObject('modResource');
 		
 		$this->resource->fromArray($this->prepare['resource']);
-		
-		// $output_resource = $this->prepare;
-		// unset($output_resource['resource']['content']);
-		// var_dump($output_resource);
 
-		// Dry run? Do not save
+		// Just simulate - nothing will be saved
+		// $this->params['dryrun'] = true;
 		if(!$this->params['dryrun'])
 			if(!$this->resource->save())	// Ups, something went wrong
 				return 'false';
-		echo '<br /><br/>';
 		
 		// Save the mail in file-system
 		if($this->params['save_mail'])
@@ -474,26 +520,33 @@
 			}
 		}
 		$this->params['resource'] = $this->resource->get('id');
-		
-		// Mail me when new, replies won't be sent again (v0.1)
-		// Used to update a resource
-		if(!$this->params['dryrun'])
-			if($this->params['runtime']['send'])
-				if(!$this->sendmail())
-					return 'Error sending mail!';
-
-		// Mark message as deleted from inbox
-		if(!$this->params['dryrun'])
-			if(!$this->params['delete_after'])
-				if(!imap_delete($this->conn, $this->params['runtime']['uid']))
-					echo 'Imap could not delete message';
-		
-		// Generate report output
-		$this->logs[] = $this->generate_output();
-
+		$this->prepare['resource']['id'] = $this->resource->get('id');
 		return true;
 	}
 	
+	/**
+	 * Find user by email
+	 * Finds a user by a given email and returns the user object
+	 * @param string $email Email address
+	 * @return object User object if found
+	 */
+	public function findUserByEmail($email)
+	{
+		$profile = $this->modx->getObject('modUserProfile', array('email' => $email));
+		// No connected profile found => FALSE
+		if(!$profile)
+			return false;
+		$user = $profile->getOne('User');
+        $this->logs['resource'][] = 'USER ID: ' . $user->get('id');
+        $this->logs['resource'][] = 'USER EMAIL: ' . $profile->get('email');
+		return $user->get('id');
+	}
+
+	/**
+	 * Save mail contents in MODx cache
+	 * @param  mixed $mail Either object or string
+	 * @return boolean       True on success, false on error
+	 */
 	public function save_mail($mail)
 	{
 		$cacheOptions = array(
@@ -501,11 +554,8 @@
             xPDO::OPT_CACHE_HANDLER => 'xPDOFileCache',
             xPDO::OPT_CACHE_EXPIRES => 0,
             );
-        // echo 'THE COMPOSED CONTENT ' . $composedNewsletter . "\n";
         $cacheElementKey = $this->params['save_mail_dir'] . $this->resource->get('id');
-        // echo 'RES ID ' . $document->get('id') . "\n";
         $this->modx->cacheManager->set($cacheElementKey, $mail, 0, $cacheOptions);
-		// $this->modx->cacheManager->writeFile($this->modx->getOption('assets_path') . $this->params['save_mail_dir'] . $this->resource->get('id') .'.txt', $mail);
 	}
 
 	/**
@@ -517,34 +567,91 @@
 	{
 		if(!$array) {
 			$report = array(
+				'Logs'		=> $this->logs,
 				'Runtime'	=> $this->params['runtime'],
 				'Resource'	=> $this->prepare['resource'],
 				'TV'		=> $this->prepare['tv'],
 			);	
 		}
-		// echo $this->generate_output($this->params['runtime']);
-		// echo $this->generate_output($this->prepare['resource']);
-		// echo $this->generate_output($this->prepare['tv']);
 		
-		// $resource = $array;
-		// unset($resource['resource']['content']);
 		if(!is_array($report))
 			return 'No data given';
-		$o[] = '<div class="container-fluid"><div class="row-fluid">';
-		foreach($report as $title => $data) {
-			$o[] = '<div class="span4">';
-			$o[] = '<h3>' . $title . '</h3>';
-			$o[] = '<table class="table table-condensed">';
-			foreach($data as $key => $value) {
-				if(is_array($value))
-					$o[] = '<tr><td>' . $key . '</td><td>' . serialize($value) . '</td></tr>';
-				else
-					$o[] = '<tr><td>' . $key . '</td><td>' . substr($value, 0, 100) . '</td></tr>';
-			}
-			$o[] = '</table>';
-			$o[] = '</div>';
+
+		$table = array(
+			'start' => '<table class="table table-condensed">',
+			'end'	=> '</table>');
+		$caption = array(
+			'start' => '<caption>',
+			'end' => '</caption>',
+			);
+		$row = array(
+			'start' => '<tr>',
+			'end' => '</tr>',
+			);
+		$column = array(
+			'start' => '<td>',
+			'end' => '</td>',
+			);
+		$delimiter = '';
+		$spacer = '<hr/>';
+		if(!$this->params['send_html']) {
+			$table = array(
+				'start' => "\n",
+				'end' => "\n",
+				);
+			$caption = array(
+				'start' => '*** ',
+				'end' => ' ***' . "\n",
+				);
+			$row = array(
+				'start' => '',
+				'end' => "\n",
+				);
+			$column = array(
+				'start' => '',
+				'end' => '',
+				);
+			$delimiter = ': ';
+			$spacer = str_repeat('-', 50);
 		}
-		$o[] = '</div></div><hr/>';
+
+		$thumbQuery = array(
+            'src' => null,
+            'w' => 200,
+            'h' => 100,
+            // 'f' => $thumbnailType,
+            // 'q' => $thumbnailQuality,
+            // 'far' => 1,
+            'HTTP_MODAUTH' => $this->modx->user->getUserToken($this->modx->context->get('key')),
+            'wctx' => 'web',
+            'source' => 1,
+        );
+
+		foreach($report as $title => $data) {
+			$o[] = $table['start'];
+			$o[] = $caption['start'] . $title . $caption['end'];
+			$pad = max(array_map('strlen', array_keys($data))) + 5;
+			foreach($data as $key => $value) {
+				
+				if(!$this->params['send_html'])
+					$key = str_pad($key . $delimiter, $pad);
+				
+				// Output image TV as <img>
+				if($this->params['send_html'])
+					if($key == $this->params['import_tv_image']) {
+						// $image = $this->modx->context->getOption('connectors_url', MODX_CONNECTORS_URL).'system/phpthumb.php?'.urldecode(http_build_query(array_merge($thumbQuery, array('src' => $value))));
+      //               	$value = '<img src="' . $image . '" />';
+						$value = '<img src="' . $this->modx->getOption('site_url') . $value . '" />';
+					}
+				
+				if(is_array($value))
+					$o[] = $row['start'] . $column['start'] . $key . $column['end'] . $column['start'] . serialize($value) . $column['end'] . $row['end'];
+				else
+					$o[] = $row['start'] . $column['start'] . $key . $column['end'] . $column['start'] . substr($value, 0, 250) . $column['end'] . $row['end'];
+			}
+			$o[] = $table['end'];
+		}
+		$o[] = $spacer;
 		return implode('', $o);
 	}
 
@@ -621,8 +728,6 @@
 	 */ 
 	public function parse_md($input = null)
 	{
-		// $input = $this->params['runtime']['markdown'];
-		// echo $input;
 		$md = new \Michelf\Markdown;
 		$md_html = $md->defaultTransform($input);
 		return $md_html;
@@ -635,20 +740,23 @@
 	 */
 	public function sendmail()
 	{
+		$to = $this->params['success_email'] ? $this->params['success_email'] : $this->params['from']['address'];
+		$msg = $this->generate_output(true);
 		$this->modx->getService('mail', 'mail.modPHPMailer');
 		// $this->modx->mail->set(modMail::MAIL_BODY,'BLOB');
 		$this->modx->mail->set(modMail::MAIL_FROM, 'anti@herooutoftime.com');
 		$this->modx->mail->set(modMail::MAIL_FROM_NAME, 'MODX HOOT');
 		$this->modx->mail->set(modMail::MAIL_SUBJECT, 'MODx Resource: ' . $this->prepare['tv']['message_id']);
-		$this->modx->mail->set(modMail::MAIL_BODY, 'Pagetitle: ' . $this->prepare['resource']['pagetitle']);
-		$this->modx->mail->address('to', $this->params['success_email'] ? $this->params['success_email'] : $this->params['from']['address']);
+		$this->modx->mail->set(modMail::MAIL_BODY, $msg);
+		$this->modx->mail->address('to', $to);
 		$this->modx->mail->address('reply-to', 'anti@herooutoftime.com');
-		$this->modx->mail->setHTML(false);
+		$this->modx->mail->setHTML($this->params['send_html']);
 		if (!$this->modx->mail->send()) {
 		    $this->logs[] = 'An error occurred while trying to send the email: '.$this->modx->mail->mailer->ErrorInfo;
 		    return false;
 		}
 		$this->modx->mail->reset();
+		$this->logs['reports'][] = 'EMAIL SENT TO: ' . $to;
 		return true;
 	}
 
@@ -743,7 +851,4 @@
 	    }
 	    return $results;
 	}
-
 }
-// $postler = new Postler($modx);
-// $postler->read();

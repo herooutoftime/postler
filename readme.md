@@ -1,7 +1,7 @@
 postler
 =======
 
-Postler is a MODx plugin/cron task to import mails into MODx resources.
+Postler is a MODx plugin/cron/component task to import mails into MODx resources.
 
 * Postler will read your mail and create MODx resources.
 * Postler will also update your MODx resources if you reply to it.
@@ -16,6 +16,7 @@ Postler is a MODx plugin/cron task to import mails into MODx resources.
 * Postler allows multiple settings to be customized by you.
 * Postler needs the PHP imap extension installed.
 * Postler has several system settings which will allow as much flexibility
+* Postler has a grid panel with some information regarding the imports and enables manual importing
 
 ## Usage
 * Go to System -> System Settings, choose *postler* namespace and edit the settings according to your needs

@@ -264,6 +264,15 @@ $components = array(
             'value' => 'example',
             'area' => 'system',
         ),
+        'postler.tv_message_id' => array( // key
+            'key' => 'postler.tv_message_id',
+            'name' => 'Postler TV Message ID',
+            'description' => 'Postler saves the message id to the TV',
+            'namespace' => 'postler',
+            'xtype' => 'textfield',
+            'value' => 'message_id',
+            'area' => 'system',
+        ),
     ),
 
     /* ************************ NEW SYSTEM EVENTS ************************* */

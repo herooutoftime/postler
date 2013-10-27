@@ -118,6 +118,7 @@ Ext.extend(postler.grid.s, MODx.grid.Grid, {
         if (this.console === null || this.console === undefined) {
             this.console = MODx.load({
                xtype: 'modx-console'
+               ,title: 'Postler-Console'
                ,register: register
                ,topic: topic
                ,show_filename: 0
@@ -144,7 +145,7 @@ Ext.extend(postler.grid.s, MODx.grid.Grid, {
             ,listeners: {
                 'success': {fn:function() {
                     this.console.show(Ext.getBody());
-                    // this.console.fireEvent('complete');
+                    this.console.fireEvent('complete');
                     this.refresh;
                 }, scope:this}
             }
