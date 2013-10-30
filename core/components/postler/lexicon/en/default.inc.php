@@ -37,8 +37,9 @@
 $_lang['postler.show_mail'] = 'Show Mail';
 $_lang['postler.batch_actions'] = 'Bulk Actions';
 $_lang['postler.mail_window.title'] = 'Mail';
+$_lang['postler.mail_window.message_id'] = 'Message ID';
 
-$_lang['postler.action.fetch'] = 'Abholen';
+$_lang['postler.action.fetch'] = 'Fetch mails';
 
-$_lang['postler.fetch.title'] = 'Mails abholen';
-$_lang['postler.fetch.text'] = 'Hiermit werden je nach Einstellung Mails in MODx importiert';
+$_lang['postler.fetch.title'] = 'Fetch mails';
+$_lang['postler.fetch.text'] = 'By confirming mails will be imported into MODx';

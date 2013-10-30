@@ -68,42 +68,61 @@
 			'runtime'			=> array(),
 			'from'				=> array(),
 			'resource'			=> array(),
-			'server'			=> $this->modx->getOption('postler.server'),
-			'user'				=> $this->modx->getOption('postler.user'),
-			'pass'				=> $this->modx->getOption('postler.pass'),
-			'port'				=> $this->modx->getOption('postler.port'),
-			'special'			=> $this->modx->getOption('postler.special'),
-			'mailbox'			=> $this->modx->getOption('postler.mailbox'),
-			'folder'			=> $this->modx->getOption('postler.folder'),
-			'email'				=> $this->modx->getOption('postler.email'),					//Only import mails from this mail address
-			'prefix'			=> $this->modx->getOption('postler.prefix'),				//Only import mails with this subject
-			'strip_prefix'		=> $this->modx->getOption('postler.strip_prefix'),
-			'publish'			=> $this->modx->getOption('postler.publish'),				//Immediately publish true or false
-			'container'			=> $this->modx->getOption('postler.container'),				//Define a container, empty means root
-			'context'			=> $this->modx->getOption('postler.context', null, 'web'),
-			'author'			=> $this->modx->getOption('postler.author'),				//Find a user with this email and set as author
-			'template'			=> $this->modx->getOption('postler.template'),				//Set a template
-			'import_attachments'=> $this->modx->getOption('postler.import_attachments'),
-			'import_directory'	=> $this->modx->getOption('postler.import_dir'),			//Choose a directory to store the attachments (relative to base_path)
-			'import_tv_image'	=> $this->modx->getOption('postler.import_tv_image'),
-			'import_tv_file'	=> $this->modx->getOption('postler.import_tv_file'),
-			'content_element'	=> $this->modx->getOption('postler.content_element'),
-			'use_markdown'		=> $this->modx->getOption('postler.use_markdown'),			//Use markdown parser
-			'compare_by'		=> $this->modx->getOption('postler.compare_by'),
-			'success_email'		=> $this->modx->getOption('postler.success_email'),			//Mail address to send success mails to, if this is set all emails will be sent to this address. Default replies to sender
-			'delete_keywords'	=> $this->modx->getOption('postler.delete_keywords'),	//Keywords to look out for for delete action
-			'delete_address'	=> $this->modx->getOption('postler.delete_address'),	//Keywords to look out for for delete action
-			'dryrun'			=> $this->modx->getOption('postler.dryrun'),
-			'delete_after'		=> $this->modx->getOption('postler.delete_after'),
-			'store_mail'		=> $this->modx->getOption('postler.store_mail'),
-			'mail_directory'	=> $this->modx->getOption('postler.mail_directory'),
-			'allowed_filetypes'	=> explode(',', $this->modx->getOption('postler.allowed_filetypes')),
-			'save_mail'			=> $this->modx->getOption('postler.save_mail'),
-			'save_mail_dir'		=> $this->modx->getOption('postler.save_mail_dir', null, 'postler/'),
-			'tv_message_id'		=> $this->modx->getOption('postler.tv_message_id'),
-			'send_html'			=> $this->modx->getOption('postler.html_emails'),
-			// 'resend'	=> $this->modx->getOption('postler.resend', null, FALSE)		//Mail me even on a reply (which is not needed really)
-			));
+		));
+
+		$settings = $this->modx->getCollection('modSystemSetting', array('namespace' => 'postler'));
+		foreach ($settings as $setting) {
+			$this->params[str_replace('postler.', '', $setting->get('key'))] = $setting->get('value');
+		}
+		// $this->params = array_merge($options, array(
+		// 	'runtime'			=> array(),
+		// 	'from'				=> array(),
+		// 	'resource'			=> array(),
+		// 	'server'			=> $this->modx->getOption('postler.server'),
+		// 	'user'				=> $this->modx->getOption('postler.user'),
+		// 	'pass'				=> $this->modx->getOption('postler.pass'),
+		// 	'port'				=> $this->modx->getOption('postler.port'),
+		// 	'special'			=> $this->modx->getOption('postler.special'),
+		// 	'mailbox'			=> $this->modx->getOption('postler.mailbox'),
+		// 	'folder'			=> $this->modx->getOption('postler.folder'),
+		// 	'email'				=> $this->modx->getOption('postler.email'),					//Only import mails from this mail address
+		// 	'prefix'			=> $this->modx->getOption('postler.prefix'),				//Only import mails with this subject
+		// 	'strip_prefix'		=> $this->modx->getOption('postler.strip_prefix'),
+		// 	'publish'			=> $this->modx->getOption('postler.publish'),				//Immediately publish true or false
+		// 	'container'			=> $this->modx->getOption('postler.container'),				//Define a container, empty means root
+		// 	'context'			=> $this->modx->getOption('postler.context', null, 'web'),
+		// 	'author'			=> $this->modx->getOption('postler.author'),				//Find a user with this email and set as author
+		// 	'template'			=> $this->modx->getOption('postler.template'),				//Set a template
+		// 	'import_attachments'=> $this->modx->getOption('postler.import_attachments'),
+		// 	'import_directory'	=> $this->modx->getOption('postler.import_dir'),			//Choose a directory to store the attachments (relative to base_path)
+		// 	'import_tv_image'	=> $this->modx->getOption('postler.import_tv_image'),
+		// 	'import_tv_file'	=> $this->modx->getOption('postler.import_tv_file'),
+		// 	'content_element'	=> $this->modx->getOption('postler.content_element'),
+		// 	'use_markdown'		=> $this->modx->getOption('postler.use_markdown'),			//Use markdown parser
+		// 	'compare_by'		=> $this->modx->getOption('postler.compare_by'),
+		// 	'success_email'		=> $this->modx->getOption('postler.success_email'),			//Mail address to send success mails to, if this is set all emails will be sent to this address. Default replies to sender
+		// 	'delete_keywords'	=> $this->modx->getOption('postler.delete_keywords'),	//Keywords to look out for for delete action
+		// 	'delete_address'	=> $this->modx->getOption('postler.delete_address'),	//Keywords to look out for for delete action
+		// 	'dryrun'			=> $this->modx->getOption('postler.dryrun'),
+		// 	'delete_after'		=> $this->modx->getOption('postler.delete_after'),
+		// 	'store_mail'		=> $this->modx->getOption('postler.store_mail'),
+		// 	'mail_directory'	=> $this->modx->getOption('postler.mail_directory'),
+		// 	'allowed_filetypes'	=> explode(',', $this->modx->getOption('postler.allowed_filetypes')),
+		// 	'save_mail'			=> $this->modx->getOption('postler.save_mail'),
+		// 	'save_mail_dir'		=> $this->modx->getOption('postler.save_mail_dir', null, 'postler/'),
+		// 	'tv_message_id'		=> $this->modx->getOption('postler.tv_message_id'),
+		// 	'html_emails'			=> $this->modx->getOption('postler.html_emails'),
+		// 	// 'resend'	=> $this->modx->getOption('postler.resend', null, FALSE)		//Mail me even on a reply (which is not needed really)
+		// 	));
+		
+		// Fallback when not fallbacking
+		if(empty($this->params['context']))
+			$this->params['context'] = 'web';
+		if($this->params['allowed_filetypes'])
+			$this->params['allowed_filetypes'] = explode(',', $this->params['allowed_filetypes']);
+		if(empty($this->params['save_mail_dir']))
+			$this->params['save_mail_dir'] = 'postler/';
+
 		if($this->params['dryrun'])
 			$this->logs['parameters'][] = 'BE AWARE: THIS IS A SIMULATION! NO DATA WILL BE STORED!';
 	}
@@ -169,6 +188,7 @@
 	public function search() {
 		$start = $this->modx->getMicroTime();
 		$criteria_str[] = 'UNDELETED';
+		$criteria_str[] = 'UNSEEN';
 		if($this->params['email'])
 			$criteria_str[] = 'FROM "' . $this->params['email'] . '"';
 		if($this->params['prefix'])
@@ -296,7 +316,6 @@
         		'message_id' => $reply[0],
         		);
         }
-
         $this->params['from']['name'] = $mail['header']->from[0]->personal;
 		$this->params['from']['address'] = $mail['header']->from[0]->mailbox . '@' . $mail['header']->from[0]->host;
 
@@ -412,6 +431,7 @@
 				'template'		=> $this->params['template'],
 				'published'		=> $this->params['publish'],
 				'publishedon'	=> strtotime($mail['header']->date),
+				'editedon'		=> time(),
 				'parent'		=> $this->params['container'],
 				'context_key'	=> $this->params['context'],
 				'createdby'		=> $this->findUserByEmail($this->mail['header']->from[0]->mailbox . '@' . $this->mail['header']->from[0]->host),
@@ -477,9 +497,9 @@
 		if(strpos($comparison, ':') !== FALSE || $this->params['runtime']['update']) {
 			// Identify the resource by the message id
 			$msg_id = $this->prepare['tv']['message_id'];
-			
+			$tv = $this->modx->getObject('modTemplateVar', array('name' => $this->params['tv_message_id']));
 			// Find TV with value
-			$tmplvars = $this->modx->getObject('modTemplateVarResource', array('tmplvarid' => 1, 'value' => $msg_id));
+			$tmplvars = $this->modx->getObject('modTemplateVarResource', array('tmplvarid' => $tv->get('id'), 'value' => $msg_id));
 			// Find the corresponding resource
 			if($tmplvars)
 				$this->resource = $this->modx->getObject('modResource', array('id' => $tmplvars->get('contentid')));
@@ -594,7 +614,7 @@
 			);
 		$delimiter = '';
 		$spacer = '<hr/>';
-		if(!$this->params['send_html']) {
+		if(!$this->params['html_emails']) {
 			$table = array(
 				'start' => "\n",
 				'end' => "\n",
@@ -633,11 +653,11 @@
 			$pad = max(array_map('strlen', array_keys($data))) + 5;
 			foreach($data as $key => $value) {
 				
-				if(!$this->params['send_html'])
+				if(!$this->params['html_emails'])
 					$key = str_pad($key . $delimiter, $pad);
 				
 				// Output image TV as <img>
-				if($this->params['send_html'])
+				if($this->params['html_emails'])
 					if($key == $this->params['import_tv_image']) {
 						// $image = $this->modx->context->getOption('connectors_url', MODX_CONNECTORS_URL).'system/phpthumb.php?'.urldecode(http_build_query(array_merge($thumbQuery, array('src' => $value))));
       //               	$value = '<img src="' . $image . '" />';
@@ -744,13 +764,13 @@
 		$msg = $this->generate_output(true);
 		$this->modx->getService('mail', 'mail.modPHPMailer');
 		// $this->modx->mail->set(modMail::MAIL_BODY,'BLOB');
-		$this->modx->mail->set(modMail::MAIL_FROM, 'anti@herooutoftime.com');
+		$this->modx->mail->set(modMail::MAIL_FROM, 'postler@herooutoftime.com');
 		$this->modx->mail->set(modMail::MAIL_FROM_NAME, 'MODX HOOT');
 		$this->modx->mail->set(modMail::MAIL_SUBJECT, 'MODx Resource: ' . $this->prepare['tv']['message_id']);
 		$this->modx->mail->set(modMail::MAIL_BODY, $msg);
 		$this->modx->mail->address('to', $to);
-		$this->modx->mail->address('reply-to', 'anti@herooutoftime.com');
-		$this->modx->mail->setHTML($this->params['send_html']);
+		$this->modx->mail->address('reply-to', 'postler@herooutoftime.com');
+		$this->modx->mail->setHTML($this->params['html_emails']);
 		if (!$this->modx->mail->send()) {
 		    $this->logs[] = 'An error occurred while trying to send the email: '.$this->modx->mail->mailer->ErrorInfo;
 		    return false;

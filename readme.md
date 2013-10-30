@@ -18,6 +18,9 @@ Postler is a MODx plugin/cron/component task to import mails into MODx resources
 * Postler has several system settings which will allow as much flexibility
 * Postler has a grid panel with some information regarding the imports and enables manual importing
 
+## Do It!
+* Handle updates via email reply as best as possible and strip the quoted mail
+
 ## Usage
 * Go to System -> System Settings, choose *postler* namespace and edit the settings according to your needs
 * Either via snippet - put [[!postler]] into a resource

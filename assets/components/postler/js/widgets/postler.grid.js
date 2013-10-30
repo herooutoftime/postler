@@ -200,6 +200,18 @@ postler.window.MailWindow = function (config) {
             xtype: 'hidden'
             ,name: 's'
         },{
+            xtype: 'textfield'
+            ,fieldLabel: _('pagetitle')
+            ,value: config.record.pagetitle
+            ,disabled: true
+            ,anchor: '100%'
+        },{
+            xtype: 'textfield'
+            ,fieldLabel: _('postler.mail_window.message_id')
+            ,value: config.record.message_id
+            ,disabled: true
+            ,anchor: '100%'
+        },{
             xtype: 'textarea'
             ,fieldLabel: _('postler.mail_window.mail')
             ,name: 'mail'
